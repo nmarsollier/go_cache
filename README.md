@@ -1,6 +1,6 @@
 [English version](https://github.com/nmarsollier/go_cache/blob/main/README_en.md))
 
-# Un cache efectivo
+# Una forma adecuada de hacer cache
 
 Cachear valores es algo sencillo de hacer, pero si no lo hacemos bien, puede ser un problema.
 
