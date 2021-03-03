@@ -1,4 +1,4 @@
-[English version](https://github.com/nmarsollier/go_cache/blob/main/README_en.md))
+[Versión en Español](https://github.com/nmarsollier/go_cache/blob/main/README.md)
 
 # A correct way to cache
 
