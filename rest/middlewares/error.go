@@ -31,11 +31,6 @@ func handleErrorIfNeeded(c *gin.Context) {
 			gin.H{
 				"error": value.Error(),
 			})
-	case error:
-		c.JSON(http.StatusInternalServerError,
-			gin.H{
-				"error": value.Error(),
-			})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err,

@@ -1,11 +1,11 @@
 package routes
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/nmarsollier/go_cache/model/profile"
-	"github.com/nmarsollier/go_cache/utils/errors"
 )
 
 // Servicio REST que nos retorna información de un dialogo a mostrar en pantalla
@@ -21,8 +21,7 @@ func getProfile(c *gin.Context) {
 	data := profile.FetchProfile("123")
 
 	if data == nil {
-		c.Error(errors.NewCustomError(500, "Internal Server Error"))
-		c.Abort()
+		c.AbortWithError(500, errors.New("Internal Server Error"))
 		return
 	}
 
