@@ -163,12 +163,12 @@ func wrongCache3(id string) *Profile {
 		return currCache.Cached().(*Profile)
 	}
 
-  // If the cached value is invalid, we lock the process, so all concurrent calls
+	// If the cached value is invalid, we lock the process, so all concurrent calls
 	// will wait, and only the first thread will perform the remote call.
 	defer(mutex.Unlock())
 	mutex.Lock()
 
-  // If other processes waited on the previous lock, cached value now must be
+	// If other processes waited on the previous lock, cached value now must be
 	// valid, so we check that value, and if it is valid, then return it
 	currCache = cache
 	if currCache != nil && currCache.Value() != nil {
@@ -220,7 +220,7 @@ func FetchProfile(id string) *Profile {
 		return currCache.Cached().(*Profile)
 	}
 
-  // If we are here, is because we need to fetch remote data
+	// If we are here, is because we need to fetch remote data
 	// loading is a semaphore, if it has value 1, then we are fetching 
 	// remote data, a 0 value when we are not in a loading process
 	loadData := atomic.CompareAndSwapInt32(&loading, 0, 1)
@@ -234,7 +234,7 @@ func FetchProfile(id string) *Profile {
 		return currCache.Cached().(*Profile)
 	}
 
-  // Until now, we where not blocking concurrent process, now we need to 
+	// Until now, we where not blocking concurrent process, now we need to 
 	// ensure that only one process will be loading data at the time
 	defer mutex.Unlock()
 	mutex.Lock()
@@ -285,12 +285,12 @@ func fineFetchProfile(t *testing.T) {
 	}
 	waitGroup.Wait()
 
-  // Previous calls should work until cache expire, i will simulate 
+	// Previous calls should work until cache expire, i will simulate 
 	// a cache expiration, setting a value that expires in 1 second
 	cache = memoize.Memoize(fetchProfile("Expired"), 1*time.Second)
 	time.Sleep(2 * time.Second)
 
-  // Next 10 concurrent calls, are done with an expired cache, but valid value
+	// Next 10 concurrent calls, are done with an expired cache, but valid value
 	// we spect that the first call fetch the data, but the others does not 
 	// lock, but return cached value
 	waitGroup.Add(10)
