@@ -235,7 +235,7 @@ func fineFetchProfile(id string) *Profile {
 		return currCache.Cached().(*Profile)
 	}
 
-  // Hasta ahora lo anterior no bloqueaba procesos concurrentes
+	// Hasta ahora lo anterior no bloqueaba procesos concurrentes
 	// a partir de aca solo un proceso puede estar en ejecución, 
 	// los demás esperan bloqueados a partir de lock()
 	defer mutex.Unlock()
@@ -285,19 +285,19 @@ func TestConcurrentFetchProfile(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(i int) {
 			defer waitGroup.Done()
-			FetchProfile(strconv.Itoa(i))
-			t.Logf("Result Step 1 = %s \n", strconv.Itoa(i))
+			p := fineFetchProfile(strconv.Itoa(i))
+			t.Logf("Result Step 1 = %s = %s \n", strconv.Itoa(i), p.Name)
 		}(i)
 	}
 	waitGroup.Wait()
 
-  // Las llamadas anteriores van a funcionar igual mientras el cache sea valido
-  // Ahora voy a simular que el cache expiro, pongo un valor con 1 segundo
+	// Las llamadas anteriores van a funcionar igual mientras el cache sea valido
+	// Ahora voy a simular que el cache expiro, pongo un valor con 1 segundo
 	// de expire time, y espero un segundo para simular que expiró
-	cache = memoize.Memoize(cache.Cached(), 1*time.Second)
-	time.Sleep(1 * time.Second)
+	cache = memoize.Memoize(fetchProfile("Expired"), 1*time.Second)
+	time.Sleep(2 * time.Second)
 
-  // En las siguientes 10 llamadas, lo que espero es que 
+	// En las siguientes 10 llamadas, lo que espero es que 
 	// se retorne el valor cacheado, ya que es valido, sin embargo
 	// Se haga fetch de un nuevo valor. por lo tanto el resultado
 	// del fetch deberia ser el ultimo, las otras 9 deberia volver el cache
@@ -305,12 +305,14 @@ func TestConcurrentFetchProfile(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(i int) {
 			defer waitGroup.Done()
-			FetchProfile(strconv.Itoa(i))
-			t.Logf("Result Step 2 = %s \n", strconv.Itoa(i))
+			p := fineFetchProfile(strconv.Itoa(i))
+			t.Logf("Result Step 2 = %s = %s \n", strconv.Itoa(i), p.Name)
 		}(i)
 	}
 	waitGroup.Wait()
 
+	p := fineFetchProfile("Final")
+	t.Logf("Value after changes = %s \n", p.Name)
 }
 ```
 
@@ -359,7 +361,7 @@ SafeMemoize es una estructura definida en el archivo safe_memorize.go que nos pe
 ---
 NOTA 
 
-Igual en el ejemplo anterior nos perdemos una oportunidad, y la pregunta es porque tengo que esperar para retornar la llamada al profile 1, porque no puedo retornar el valor de cache incluso para profile 1 y llamar el update en una gorroutine ?
+En el ejemplo anterior nos perdemos otra oportunidad importante, y la pregunta es porque tengo que esperar para retornar la llamada al profile 1, porque no puedo retornar el valor de cache incluso para profile 1 y llamar el update en una goroutine ?
 
 Este ejemplo final resuelve ese problema, pero te dejo a ti ver el código como lo resuelvo.
 

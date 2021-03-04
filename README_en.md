@@ -279,18 +279,16 @@ func fineFetchProfile(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(i int) {
 			defer waitGroup.Done()
-			FetchProfile(strconv.Itoa(i))
-			t.Logf("Result Step 1 = %s \n", strconv.Itoa(i))
+			p := fineFetchProfile(strconv.Itoa(i))
+			t.Logf("Result Step 1 = %s = %s \n", strconv.Itoa(i), p.Name)
 		}(i)
 	}
 	waitGroup.Wait()
 
   // Previous calls should work until cache expire, i will simulate 
 	// a cache expiration, setting a value that expires in 1 second
-	cache = memoize.Memoize(cache.Cached(), 1*time.Second)
-	
-	// wait to expire
-	time.Sleep(1 * time.Second)
+	cache = memoize.Memoize(fetchProfile("Expired"), 1*time.Second)
+	time.Sleep(2 * time.Second)
 
   // Next 10 concurrent calls, are done with an expired cache, but valid value
 	// we spect that the first call fetch the data, but the others does not 
@@ -299,11 +297,14 @@ func fineFetchProfile(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(i int) {
 			defer waitGroup.Done()
-			FetchProfile(strconv.Itoa(i))
-			t.Logf("Result Step 2 = %s \n", strconv.Itoa(i))
+			p := fineFetchProfile(strconv.Itoa(i))
+			t.Logf("Result Step 2 = %s = %s \n", strconv.Itoa(i), p.Name)
 		}(i)
 	}
 	waitGroup.Wait()
+
+	p := fineFetchProfile("Final")
+	t.Logf("Value after changes = %s \n", p.Name)
 
 }
 ```
