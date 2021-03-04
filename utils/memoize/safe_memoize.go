@@ -36,14 +36,10 @@ func (m *SafeMemoize) Value(
 		// No data cached, just lock the concurrent calls
 		currCache = m.fetchData(fetchFunc)
 	case loadData:
-		// There is a valid cache, and we need to load data, do it in goroutine
+		// There is a valid cache, load in goroutine
 		go m.fetchData(fetchFunc)
-	case !loadData:
-		// No need to load data, just return the actual value
-		return currCache.Cached()
 	}
 
-	currCache = m.cache
 	return currCache.Cached()
 }
 
