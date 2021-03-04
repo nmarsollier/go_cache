@@ -39,6 +39,12 @@ func (m *SafeMemoize) Value(
 		go m.fetchData(fetchFunc)
 	}
 
+	// The only possibility of nil, is on first cache load error
+	// process will retry but this one has failed
+	if currCache == nil {
+		return nil
+	}
+
 	return currCache.Cached()
 }
 
@@ -55,7 +61,11 @@ func (m *SafeMemoize) fetchData(
 	defer func() { m.loading = 0 }()
 
 	currCache = fetchFunc()
-	m.cache = currCache
+	if currCache != nil {
+		// nil means an error, to be resilent will not update chache
+		// dev need to work on a good error handler
+		m.cache = currCache
+	}
 	return currCache
 }
 
