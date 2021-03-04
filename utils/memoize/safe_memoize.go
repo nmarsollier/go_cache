@@ -31,11 +31,10 @@ func (m *SafeMemoize) Value(
 	}
 
 	loadData := atomic.CompareAndSwapInt32(&m.loading, 0, 1)
-	switch {
-	case currCache == nil:
+	if currCache == nil {
 		// No data cached, just lock the concurrent calls
 		currCache = m.fetchData(fetchFunc)
-	case loadData:
+	} else if loadData {
 		// There is a valid cache, load in goroutine
 		go m.fetchData(fetchFunc)
 	}

@@ -12,7 +12,8 @@ var profileMemoize = memoize.NewSafeMemoize()
 func FetchProfile(id string) *Profile {
 	return profileMemoize.Value(
 		func() *memoize.Memo {
-			return memoize.Memoize(fetchProfile(id), 10*time.Minute)
+			data := fetchProfile(id)
+			return memoize.Memoize(data, 10*time.Minute)
 		},
 	).(*Profile)
 }

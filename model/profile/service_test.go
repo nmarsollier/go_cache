@@ -96,6 +96,9 @@ func TestSafeFetchProfile(t *testing.T) {
 	}
 	waitGroup.Wait()
 
-	p := fineFetchProfile("Final")
+	// Lets wait until fetch goroutine ends
+	time.Sleep(2 * time.Second)
+
+	p := FetchProfile("Final")
 	t.Logf("Value after changes = %s \n", p.Name)
 }
