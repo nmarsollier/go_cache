@@ -264,7 +264,7 @@ func FetchProfile(id string) *Profile {
 }
 ```
 
-**Testts that validates the process** 
+**Tests that validates the process** 
 
 The next test is weird, just to visually demonstrates the correct working :
 
