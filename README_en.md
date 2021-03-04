@@ -243,7 +243,7 @@ func FetchProfile(id string) *Profile {
 	// could hold the value to return, we need to ensure use it to prevent 
 	// incorrect fetching
 	currCache = cache
-	if currCache != nil && currCache.Value() != nil {
+	if loading == 0 && currCache != nil && currCache.Value() != nil {
 		// We are here if we have been Looked previously
 		return currCache.Cached().(*Profile)
 	}
@@ -269,7 +269,7 @@ func FetchProfile(id string) *Profile {
 The next test is weird, just to visually demonstrates the correct working :
 
 ```go
-func TestConcurrentFetchProfile(t *testing.T) {
+func fineFetchProfile(t *testing.T) {
 	invalidateCache()
 
 	// 2 steps, first we call 10 concurrent calls with cache = nil
@@ -312,41 +312,82 @@ We can see in the results :
 
 ```
 === RUN   TestConcurrentFetchProfile
-Fetching Profile... 2        // fetch call 2
+Fetching Profile... 1        // fetch call 1
 
 // There is no cahce, first call fetchs and is the first to return
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 2  
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 9  
-		
-// other threads had to wait the lock 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 6 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 5 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 7 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 8 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 0 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 1 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 4 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 3 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 1 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 5 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 2 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 9 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 0 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 3 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 4 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 8 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 6 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 7 = Profile # 1
 
 // When we have an expired cache...
 // first call will fetch data
-Fetching Profile... 3    
+Fetching Profile... 1    
 
 // the concurrent calls will receive the caced value
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 5 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 4 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 9 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 0 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 6 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 7 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 2 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 1 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 8 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 3 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 2 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 6 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 4 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 0 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 7 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 9 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 3 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 5 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 8 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 1 = Profile # 1
+TestConcurrentFetchProfile: service_test.go:69: Value after changes = Profile # 0 
 
-// After process 3 fetchs data will return at the end
+// After process 1 fetchs data will return at the end
 --- PASS: TestConcurrentFetchProfile 
 ```
+
+## Doing a library to generalize the logic
+
+---
+NOTE 
+
+We are missing another important oportunity in the before routine, and the question is why on the second step I wait to return the new value for profile 1, why I can't return the cached value for that request too, and fetch data in a goroutine ?
+
+This final library solves that problem, but I will let you find how.
+
+---
+
+SafeMemoize is an struct defined in file safe_memorize.go that allow us to generalize the cache logic.
+
+It has only one method, besides the constructor :
+
+```go
+// Value get cached value, fetching data if needed
+func (m *SafeMemoize) Value(
+	fetchFunc func() *Memo,
+) interface{} {
+	...
+}
+```
+
+The only piece of code that we need to privide is the updater function, that most if the times it will be a closure like this :
+
+
+```go
+var profileMemoize = memoize.NewSafeMemoize()
+
+// FetchProfile fetch the current profile
+func FetchProfile(id string) *Profile {
+	return profileMemoize.Value(
+		func() *memoize.Memo {
+			return memoize.Memoize(fetchProfile(id), 10*time.Minute)
+		},
+	).(*Profile)
+}
+```
+
+And that's it, we have a cache library to catch any value from remotes, and we can use it easy.
 
 ## Note
 

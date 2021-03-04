@@ -46,23 +46,56 @@ func TestConcurrentFetchProfile(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(i int) {
 			defer waitGroup.Done()
-			FetchProfile(strconv.Itoa(i))
-			t.Logf("Result Step 1 = %s \n", strconv.Itoa(i))
+			p := fineFetchProfile(strconv.Itoa(i))
+			t.Logf("Result Step 1 = %s = %s \n", strconv.Itoa(i), p.Name)
 		}(i)
 	}
 	waitGroup.Wait()
 
-	cache = memoize.Memoize(cache.Cached(), 1*time.Second)
-	time.Sleep(1 * time.Second)
+	cache = memoize.Memoize(fetchProfile("Expired"), 1*time.Second)
+	time.Sleep(2 * time.Second)
 
 	waitGroup.Add(10)
 	for i := 0; i < 10; i++ {
 		go func(i int) {
 			defer waitGroup.Done()
-			FetchProfile(strconv.Itoa(i))
-			t.Logf("Result Step 2 = %s \n", strconv.Itoa(i))
+			p := fineFetchProfile(strconv.Itoa(i))
+			t.Logf("Result Step 2 = %s = %s \n", strconv.Itoa(i), p.Name)
 		}(i)
 	}
 	waitGroup.Wait()
 
+	p := fineFetchProfile("Final")
+	t.Logf("Value after changes = %s \n", p.Name)
+}
+
+func TestSafeFetchProfile(t *testing.T) {
+	invalidateTSCache()
+
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(10)
+	for i := 0; i < 10; i++ {
+		go func(i int) {
+			defer waitGroup.Done()
+			p := FetchProfile(strconv.Itoa(i))
+			t.Logf("Result Step 1 = %s = %s \n", strconv.Itoa(i), p.Name)
+		}(i)
+	}
+	waitGroup.Wait()
+
+	profileMemoize.ReplaceMockCache(memoize.Memoize(fetchProfile("Expired"), 1*time.Second))
+	time.Sleep(2 * time.Second)
+
+	waitGroup.Add(10)
+	for i := 0; i < 10; i++ {
+		go func(i int) {
+			defer waitGroup.Done()
+			p := FetchProfile(strconv.Itoa(i))
+			t.Logf("Result Step 2 = %s = %s \n", strconv.Itoa(i), p.Name)
+		}(i)
+	}
+	waitGroup.Wait()
+
+	p := fineFetchProfile("Final")
+	t.Logf("Value after changes = %s \n", p.Name)
 }

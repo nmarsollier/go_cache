@@ -212,7 +212,7 @@ var cache *memoize.Memo = nil
 var mutex = &sync.Mutex{}
 var loading int32 = 0
 
-func FetchProfile(id string) *Profile {
+func fineFetchProfile(id string) *Profile {
 	// Copiamos el cache en variable local, para evitar race conditions del if
 	currCache := cache
 	if currCache != nil && currCache.Value() != nil {
@@ -246,7 +246,7 @@ func FetchProfile(id string) *Profile {
 	// cache actual, hay que validar esto. 
 	// El primer proceso "el que carga" no retorna.
 	currCache = cache
-	if currCache != nil && currCache.Value() != nil {
+	if loading == 0 && currCache != nil && currCache.Value() != nil {
 		// Entra aca si es un proceso que estuvo esperando una carga
 		// y luego del unlock, hay un valor valido para retornar
 		return currCache.Cached().(*Profile)
@@ -318,39 +318,82 @@ Ahora como podemos ver en estos tests :
 
 ```
 === RUN   TestConcurrentFetchProfile
-Fetching Profile... 2        // aca se hace fetch del 2
+Fetching Profile... 1        // aca se hace fetch del 2
 
-// Como no hay cache valido, se recupera el 2 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 2  
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 9  
-		
-// luego los demas, porque no habia valor valido tuvieron que esperar 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 6 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 5 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 7 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 8 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 0 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 1 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 4 
-    TestConcurrentFetchProfile: service_test.go:52: Result Step 1 = 3 
+// Como no hay cache valido, se recupera el 1 los demas se bloquean 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 5 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 1 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 2 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 9 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 0 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 3 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 4 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 8 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 6 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:50: Result Step 1 = 7 = Profile # 1 
 
-// Se esta haciendo fetch de 3
-Fetching Profile... 3    
+// Se esta haciendo fetch de 1
+Fetching Profile... 1   
 
-// el cache es valido, estos siguientes valores son los del cache
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 5 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 4 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 9 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 0 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 6 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 7 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 2 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 1 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 8 
-    TestConcurrentFetchProfile: service_test.go:65: Result Step 2 = 3 
-// El 3 se devuelve al final
+// el cache es valido, se retorna el cache, y solo el 1 se retorna cuando 
+// se tiene el valor
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 2 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 6 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 4 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 0 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 7 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 9 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 3 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 5 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 8 = Profile # Expired 
+TestConcurrentFetchProfile: service_test.go:63: Result Step 2 = 1 = Profile # 1 
+TestConcurrentFetchProfile: service_test.go:69: Value after changes = Profile # 0 
+// El 1 se devuelve al final
 --- PASS: TestConcurrentFetchProfile (3.01s)
 ```
+
+## Haciendo una librería para generalizar el cache
+
+SafeMemoize es una estructura definida en el archivo safe_memorize.go que nos permite reutilizar la logica anterior.
+
+---
+NOTA 
+
+Igual en el ejemplo anterior nos perdemos una oportunidad, y la pregunta es porque tengo que esperar para retornar la llamada al profile 1, porque no puedo retornar el valor de cache incluso para profile 1 y llamar el update en una gorroutine ?
+
+Este ejemplo final resuelve ese problema, pero te dejo a ti ver el código como lo resuelvo.
+
+---
+
+Tiene un solo método que deberíamos usar :
+
+```go
+// Value get cached value, fetching data if needed
+func (m *SafeMemoize) Value(
+	fetchFunc func() *Memo,
+) interface{} {
+	...
+}
+```
+
+La única pieza de código que nos exige, es una función que recupera los datos remotos y retorna un nuevo Memo para actualizar, la mayoría de las veces esta función va a ser un  closure como el siguiente :
+
+
+```go
+var profileMemoize = memoize.NewSafeMemoize()
+
+// FetchProfile fetch the current profile
+func FetchProfile(id string) *Profile {
+	return profileMemoize.Value(
+		func() *memoize.Memo {
+			data := fetchProfile(id)
+			return memoize.Memoize(data, 10*time.Minute)
+		},
+	).(*Profile)
+}
+```
+
+Y eso es todo, ahora tenemos toda la lógica de cache generalizada y podemos reutilizarla donde sea necesario.
 
 ## Nota
 

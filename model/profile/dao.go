@@ -20,7 +20,7 @@ func fetchProfile(id string) *Profile {
 	return &Profile{
 		ID:    id,
 		Login: "nmarsollier",
-		Name:  "Nestor Marsollier",
+		Name:  "Profile # " + id,
 		Web:   "https://github.com/nmarsollier/profile",
 	}
 }
