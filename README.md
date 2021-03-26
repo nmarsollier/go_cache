@@ -112,7 +112,7 @@ Lo correcto es retornar, ya que Cached no tiene en cuenta la validez del cache, 
 
 ### Race condition en la carga de datos
 
-Supongamos ahora que mas de un proceso llama en forma concurrent a esta función, si fetchProfile fuera una operación de milisegundos, no seria un problema, pero ya que es una operación que puede llevar segundos en terminar, estos procesos podrían tomando el valor de cache invalido, todos juntos, y todos ellos llamarían a fetchProfile en forma concurrente, lo que podría provocar no solo llamadas múltiples, sino colapsar el servicio remoto, haciendo que las respuestas sean cada vez mas caras de evaluar.
+Supongamos ahora que mas de un proceso llama en forma concurrent a esta función, si fetchProfile fuera una operación de milisegundos, no seria un problema, pero ya que es una operación que puede llevar segundos en terminar, estos procesos podrían tomar el valor de cache invalido, todos juntos, y todos ellos llamarían a fetchProfile en forma concurrente, lo que podría provocar no solo llamadas múltiples, sino colapsar el servicio remoto, haciendo que las respuestas sean cada vez mas caras de evaluar [Ver](https://en.wikipedia.org/wiki/Cache_stampede).
 
 ```go
 func WrongCache2(id string) *Profile {

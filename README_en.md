@@ -111,9 +111,9 @@ The correct way to return the value, is using Cahche() function, that does not v
 	return currCache.Cached().(*Profile)
 ```
 
-#### loading data Race condition
+#### Data load race condition
 
-Now, fetchProfile is a function that is hard to compute, it takes some time to fetch, and if we have many concurrent process calling this function, those process calling all at the same time will be doing the same highly cost call over the network, the will block responses, and of course could saturate the remote service, making responses more hard to evaluate.
+Now, fetchProfile is a function that is hard to compute, it takes some time to fetch, and if we have many concurrent process calling this function, those process calling all at the same time will be doing the same highly cost call over the network, the will block responses, and of course could saturate the remote service, making responses more hard to evaluate. [See](https://en.wikipedia.org/wiki/Cache_stampede)
 
 ```go
 func WrongCache2(id string) *Profile {
